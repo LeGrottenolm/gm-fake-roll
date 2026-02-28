@@ -1,0 +1,9 @@
+{
+  "id": "gm-fake-roll",
+  "title": "GM Fake Roll",
+  "description": "Verdeckte Würfe mit WFRP4e-Integration.",
+  "version": "4.1.0",
+  "compatibility": { "minimum": "12", "verified": "13" },
+  "authors": [{ "name": "Olmo" }],
+  "esmodules": ["scripts/main.js"]
+}
