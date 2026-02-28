@@ -1,0 +1,139 @@
+<div id="fkr-root" style="display:flex; flex-direction:column; gap:10px; padding:4px 0;">
+
+  {{!-- Würfelnder Actor --}}
+  {{#if actorName}}
+    <div style="background:#1a1a2e; border:1px solid #3a3a5c; border-radius:4px; padding:6px;">
+      <p style="margin:0; color:#7ec8e3;">
+        <i class="fas fa-user-shield"></i> <b>{{actorName}}</b>
+        {{#if advantage}}
+          &nbsp;|&nbsp;<span style="color:#ffd700;">⚔️ Advantage: {{advantage}}</span>
+        {{/if}}
+      </p>
+      {{#if conditions}}
+        <p style="margin:4px 0 0 0; font-size:0.85em; color:#e8a87c;">
+          ⚠️ Conditions: {{#each conditions}}<span style="margin-right:4px;">{{this}}</span>{{/each}}
+        </p>
+      {{/if}}
+    </div>
+  {{else}}
+    <p style="margin:0; color:#f4a460; background:#2a1a1a; padding:6px; border-radius:4px;">
+      ⚠️ Kein Token selektiert.
+    </p>
+  {{/if}}
+
+  {{!-- Ziel --}}
+  {{#if targetName}}
+    <div style="background:#1a2e1a; border:1px solid #3a5c3a; border-radius:4px; padding:6px;">
+      <p style="margin:0; color:#90ee90;">
+        <i class="fas fa-crosshairs"></i> <b>Ziel: {{targetName}}</b>
+      </p>
+      {{#if targetComparison}}
+        <p style="margin:4px 0 0 0; font-size:0.85em; color:#ccc;">{{{targetComparison}}}</p>
+      {{/if}}
+    </div>
+  {{/if}}
+
+  {{!-- Fertigkeit --}}
+  <div class="form-group">
+    <label><b>Fertigkeit / Charakteristik</b></label>
+    <select name="fkr-skill-select" id="fkr-skill-select" style="width:100%">
+      {{#each skills}}
+        <option value="{{this.value}}"
+          data-base="{{this.base}}"
+          data-name="{{this.name}}"
+          data-is-magic="{{this.isMagic}}">
+          {{this.name}} ({{this.base}}{{#if this.modifier}} {{this.modifierStr}}{{/if}} = {{this.value}})
+        </option>
+      {{/each}}
+      {{#unless skills}}
+        <option value="45" data-base="45" data-is-magic="false">-- Manuell --</option>
+      {{/unless}}
+    </select>
+  </div>
+
+  {{!-- Extended Tests --}}
+  {{#if extendedTests}}
+    <div class="form-group">
+      <label><b>Extended Test</b> <span style="opacity:.6">(optional)</span></label>
+      <select name="fkr-extended-select" id="fkr-extended-select" style="width:100%">
+        <option value="">-- Kein Extended Test --</option>
+        {{#each extendedTests}}
+          <option value="{{this.id}}" data-current="{{this.current}}" data-target="{{this.target}}">
+            {{this.name}} ({{this.current}}/{{this.target}} SL)
+          </option>
+        {{/each}}
+      </select>
+    </div>
+  {{/if}}
+
+  {{!-- Preset-Buttons --}}
+  <div class="form-group">
+    <label><b>Ergebnis</b></label>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+      <button type="button" class="fkr-preset" data-mode="crit-success"
+        style="background:#1a4a1a; border:1px solid #2d8c2d; cursor:pointer; padding:5px; border-radius:3px;">
+        ⚡ Krit. Erfolg
+      </button>
+      <button type="button" class="fkr-preset" data-mode="success"
+        style="background:#1a3a1a; border:1px solid #4a9c4a; cursor:pointer; padding:5px; border-radius:3px;">
+        ✅ Erfolg
+      </button>
+      <button type="button" class="fkr-preset" data-mode="fail"
+        style="background:#3a1a1a; border:1px solid #9c4a4a; cursor:pointer; padding:5px; border-radius:3px;">
+        ❌ Misserfolg
+      </button>
+      <button type="button" class="fkr-preset" data-mode="crit-fail"
+        style="background:#4a1a1a; border:1px solid #8c2d2d; cursor:pointer; padding:5px; border-radius:3px;">
+        💀 Krit. Versagen
+      </button>
+    </div>
+  </div>
+
+  {{!-- Ergebnis-Eingabe --}}
+  <div class="form-group">
+    <label><b>Würfelergebnis (W100)</b>
+      <span style="opacity:.6">(auto-berechnet, überschreibbar)</span>
+    </label>
+    <input name="fkr-result" id="fkr-result" type="number"
+      value="50" min="1" max="100"
+      style="width:100%; font-size:1.3em; text-align:center; font-weight:bold;"/>
+  </div>
+
+  {{!-- SL-Anzeige --}}
+  <div id="fkr-sl-display"
+    style="text-align:center; font-size:0.95em; color:#aaa; min-height:1.3em;"></div>
+
+  {{!-- Miscast-Warnung --}}
+  <div id="fkr-miscast-warning"
+    style="display:none; color:#ff6b6b; font-size:0.85em; background:#2a1a1a;
+           border:1px solid #8c2d2d; border-radius:4px; padding:5px;">
+    🔮 Kritisches Versagen bei Magie → Miscast! Wird in der Konsole geloggt.
+  </div>
+
+  {{!-- Flavor --}}
+  <div class="form-group">
+    <label><b>Flavor-Text</b> <span style="opacity:.6">(im Chat)</span></label>
+    <input name="fkr-flavor" id="fkr-flavor" type="text"
+      placeholder="z.B.: Wahrnehmungsprobe des Wächters" style="width:100%"/>
+  </div>
+
+  {{!-- GM-Notiz --}}
+  <div class="form-group">
+    <label><b>GM-Notiz</b> <span style="opacity:.6">(nur Konsole)</span></label>
+    <input name="fkr-gmnote" id="fkr-gmnote" type="text"
+      placeholder="z.B.: NSC versagt absichtlich..."
+      style="width:100%; font-style:italic; opacity:.8"/>
+  </div>
+
+  {{!-- Sichtbarkeit --}}
+  <div class="form-group">
+    <label><b>Chat-Sichtbarkeit</b></label>
+    <select name="fkr-mode" id="fkr-mode" style="width:100%">
+      <option value="publicroll">Öffentlich (alle)</option>
+      <option value="gmroll">GM-Roll</option>
+      <option value="blindroll">Blind (nur GM)</option>
+      <option value="selfroll">Self Roll</option>
+    </select>
+  </div>
+
+</div>
