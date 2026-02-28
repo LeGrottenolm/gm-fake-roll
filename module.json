@@ -1,8 +1,8 @@
 {
   "id": "gm-fake-roll",
-  "title": "GM Fake Roll",
-  "description": "Verdeckte Würfe mit WFRP4e-Integration.",
-  "version": "4.1.0",
+  "title": "Olms Admin-Addon",
+  "description": "Administratives Hilfswerkzeug für den Spielleiter.",
+  "version": "5.2.0",
   "compatibility": {
     "minimum": "12",
     "verified": "13",
@@ -17,5 +17,5 @@
     "scripts/main.js"
   ],
   "manifest": "https://raw.githubusercontent.com/LeGrottenolm/gm-fake-roll/main/module.json",
-  "download": "https://github.com/LeGrottenolm/gm-fake-roll/archive/refs/heads/main.zip"
+  "download": "https://github.com/LeGrottenolmo/gm-fake-roll/archive/refs/heads/main.zip"
 }
