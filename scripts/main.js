@@ -1,6 +1,5 @@
 // ============================================================
-//  GM Fake Roll v5.0 – WFRP4e Native Test Hijack
-//  Nutzt WFRP4e's eigenes Testsystem statt rohem Roll
+//  GM Fake Roll v5.1 – WFRP4e skipDialog + test.roll()
 // ============================================================
 const MODULE_ID = "gm-fake-roll";
 
@@ -166,7 +165,7 @@ function calcPreset(mode, sv) {
 }
 
 // ============================================================
-//  KERN: WFRP4e Test hijacken
+//  KERN: WFRP4e Test mit skipDialog + direkter Roll-Injektion
 // ============================================================
 async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gmNote, isMagic) {
 
@@ -184,29 +183,34 @@ async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gm
     );
   }
 
-  // Einmaliger Hook: überschreibt das Würfelergebnis VOR WFRP4e-Auswertung
-  const hookId = Hooks.once("wfrp4e:preRollTest", (rollData) => {
-    rollData.roll = desiredTotal;
-  });
-
   try {
+    let test;
+
     if (itemType === "weapon") {
       const weapon = actor.items.get(itemId);
       if (!weapon) throw new Error(`Waffe nicht gefunden: ${itemId}`);
-      await actor.setupWeapon(weapon, { skipTargeting: false });
+      test = await actor.setupWeapon(weapon, { skipDialog: true });
 
     } else if (itemType === "skill") {
       const skill = actor.items.get(itemId);
       if (!skill) throw new Error(`Fertigkeit nicht gefunden: ${itemId}`);
-      await actor.setupSkill(skill);
+      test = await actor.setupSkill(skill, { skipDialog: true });
 
     } else if (itemType === "characteristic") {
       const charKey = itemId.replace("char_", "");
-      await actor.setupCharacteristic(charKey);
+      test = await actor.setupCharacteristic(charKey, { skipDialog: true });
     }
 
+    if (!test) throw new Error("Test-Objekt konnte nicht erstellt werden.");
+
+    // Ergebnis in alle bekannten WFRP4e-Datenpfade injizieren
+    test.context.roll         = desiredTotal;
+    test.context.preData.roll = desiredTotal;
+
+    // WFRP4e wertet den Test aus: SL, Schaden, Trefferzone etc.
+    await test.roll({ roll: desiredTotal });
+
   } catch (err) {
-    Hooks.off("wfrp4e:preRollTest", hookId);
     ui.notifications.error(`[GM Fake Roll] Fehler: ${err.message}`);
     console.error("[GM Fake Roll]", err);
   }
@@ -373,7 +377,7 @@ Hooks.once("ready", () => {
 
   game.gmFakeRoll = { open: openFakeRollDialog, roll: performFakeRoll };
   console.log(
-    `%c${MODULE_ID} v5.0 | WFRP4e Native Hook bereit. Shift+R zum Öffnen.`,
+    `%c${MODULE_ID} v5.1 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
     "color:#7ec8e3; font-weight:bold;"
   );
 });
