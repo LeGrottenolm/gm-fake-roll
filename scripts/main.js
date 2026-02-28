@@ -1,15 +1,10 @@
 // ============================================================
-//  GM Fake Roll v4.1 – Foundry VTT v12/v13 kompatibel
-//  Fixes: DialogV2-Callbacks, Conditions via statuses-Set,
-//         form-Tag, SL-Cap, Actor-Referenz beim Submit
+//  GM Fake Roll v4.2 – Fixes: Doppel-Dialog, Speaker, Waffen
 // ============================================================
 const MODULE_ID = "gm-fake-roll";
 
 const getDieClass = () => foundry.dice?.terms?.Die ?? Die;
 
-// ============================================================
-//  Condition-Modifikatoren (WFRP4e Regelwerk)
-// ============================================================
 const CONDITION_MODIFIERS = {
   "fatigued":  -10,
   "exhausted": -20,
@@ -32,17 +27,14 @@ function getActorData() {
   const advantage      = actor.system?.status?.advantage?.value ?? 0;
   const advantageBonus = advantage * 10;
 
-  // FIX: Conditions korrekt über effect.statuses (v11+) auslesen
   let conditionModifier = 0;
   const activeConditions = [];
   for (const effect of actor.effects ?? []) {
     if (effect.disabled) continue;
     for (const [statusId, mod] of Object.entries(CONDITION_MODIFIERS)) {
-      // v11+: effect.statuses ist ein Set<string>
       const hasStatus = effect.statuses?.has(statusId)
-        // Fallback für ältere Welten: name-Vergleich
-        ?? effect.name?.toLowerCase().includes(statusId)
-        ?? false;
+                     ?? effect.name?.toLowerCase().includes(statusId)
+                     ?? false;
       if (hasStatus) {
         conditionModifier += mod;
         activeConditions.push(`${effect.name ?? statusId} (${mod > 0 ? "+" : ""}${mod})`);
@@ -81,6 +73,21 @@ function getActorData() {
       list.push(buildEntry(i.name, base, isMagic));
     });
 
+  // FIX 3: Waffen
+  const RANGED_GROUPS = ["bow", "crossbow", "blackpowder", "throwing", "engineering", "entangling"];
+  actor.items
+    .filter(i => i.type === "weapon")
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(i => {
+      const weaponGroup = i.system?.weaponGroup?.value ?? "";
+      const isRanged    = RANGED_GROUPS.includes(weaponGroup);
+      const charKey     = isRanged ? "bs" : "ws";
+      const charBase    = actor.system?.characteristics?.[charKey]?.value ?? 0;
+      list.push({
+        ...buildEntry(`⚔️ ${i.name} (${isRanged ? "BS" : "WS"})`, charBase, false),
+      });
+    });
+
   // Extended Tests
   const extendedTests = actor.items
     .filter(i => i.type === "extendedTest")
@@ -95,7 +102,7 @@ function getActorData() {
 }
 
 // ============================================================
-//  Ziel-Daten auslesen (T-Target mit Fallback)
+//  Ziel-Daten
 // ============================================================
 function getTargetData(rollerSkillValue) {
   const targetToken = [...(game.user?.targets ?? [])][0]
@@ -117,10 +124,10 @@ function getTargetData(rollerSkillValue) {
 }
 
 // ============================================================
-//  SL berechnen – FIX: Cap bei 10 Zehner-Stellen (max. 100)
+//  SL berechnen
 // ============================================================
 function calcSL(rollResult, skillValue) {
-  const tens     = (n) => Math.floor(Math.min(n, 100) / 10);
+  const tens = (n) => Math.floor(Math.min(n, 100) / 10);
   return tens(skillValue) - tens(rollResult);
 }
 
@@ -173,7 +180,6 @@ function distributeResult(diceTerms, targetSum) {
   let remaining = Math.min(Math.max(targetSum, minT), maxT) - minT;
 
   for (const sl of slots) { sl.r.result = 1; sl.r.active = true; delete sl.r.discarded; }
-
   for (const sl of [...slots].sort(() => Math.random() - 0.5)) {
     if (remaining <= 0) break;
     const add = Math.min(remaining, sl.faces - 1);
@@ -211,6 +217,13 @@ async function performFakeRoll(formula, desiredTotal, rollMode, flavor, gmNote, 
   if (!Roll.validate(formula))
     return ui.notifications.error(`[GM Fake Roll] Ungültige Formel: "${formula}"`);
 
+  // FIX 2: Actor frisch holen für Speaker
+  const actor   = (actorId ? game.actors.get(actorId) : null)
+               ?? canvas?.tokens?.controlled?.[0]?.actor;
+  const speaker = actor
+    ? ChatMessage.getSpeaker({ actor })
+    : ChatMessage.getSpeaker();
+
   const Die       = getDieClass();
   const roll      = await new Roll(formula).evaluate();
   const diceTerms = roll.terms.filter(t => t instanceof Die);
@@ -227,7 +240,6 @@ async function performFakeRoll(formula, desiredTotal, rollMode, flavor, gmNote, 
     }
   }
 
-  // SL in Flavor einbauen
   let flavorText = flavor || null;
   if (skillValue) {
     const sl    = calcSL(desiredTotal, skillValue);
@@ -235,15 +247,13 @@ async function performFakeRoll(formula, desiredTotal, rollMode, flavor, gmNote, 
     flavorText  = flavor ? `${flavor} (SL: ${slStr})` : `SL: ${slStr}`;
   }
 
-  // Miscast
   if (isMagic && desiredTotal >= 96) {
     console.warn(
       `%c[GM Fake Roll | ⚠️ MISCAST] ${flavor || "Zauberwurf"} → W100: ${desiredTotal}`,
-      "color:#ff6b6b; font-weight:bold; font-size:1.1em;"
+      "color:#ff6b6b; font-weight:bold;"
     );
   }
 
-  // GM-Notiz
   if (gmNote) {
     console.log(
       `%c[GM Fake Roll | ${new Date().toLocaleTimeString()}] ${flavor || "–"} → ${gmNote}`,
@@ -251,10 +261,12 @@ async function performFakeRoll(formula, desiredTotal, rollMode, flavor, gmNote, 
     );
   }
 
-  // FIX: rollMode korrekt im options-Objekt übergeben (v13)
-  await roll.toMessage({ flavor: flavorText }, { rollMode, create: true });
+  // FIX 2: speaker mitübergeben
+  await roll.toMessage(
+    { flavor: flavorText, speaker },
+    { rollMode, create: true }
+  );
 
-  // FIX: Actor frisch aus der Szene holen, nicht gecacht
   if (extendedTestId && actorId && skillValue) {
     const freshActor = game.actors.get(actorId)
                     ?? canvas?.tokens?.controlled?.[0]?.actor;
@@ -263,11 +275,9 @@ async function performFakeRoll(formula, desiredTotal, rollMode, flavor, gmNote, 
 }
 
 // ============================================================
-//  Render-Listener (shared für v12 + v13)
-//  FIX: Nimmt jetzt immer ein HTMLElement entgegen
+//  Dialog-Listener
 // ============================================================
 function attachDialogListeners(element) {
-  // Normalisierung: jQuery → HTMLElement
   const root = (typeof element?.get === "function") ? element[0] : element;
 
   const skillSelect    = root.querySelector("#fkr-skill-select");
@@ -286,9 +296,10 @@ function attachDialogListeners(element) {
     const sl     = calcSL(result, sv);
     const color  = sl >= 0 ? "#90ee90" : "#e8a87c";
     slDisplay.innerHTML =
-      `<span style="color:${color}; font-weight:bold; font-size:1.1em;">SL: ${sl >= 0 ? "+" : ""}${sl}</span>`;
+      `<span style="color:${color}; font-weight:bold; font-size:1.1em;">
+        SL: ${sl >= 0 ? "+" : ""}${sl}
+      </span>`;
 
-    // Miscast-Warnung
     if (miscastWarning) {
       const opt     = skillSelect?.options?.[skillSelect.selectedIndex];
       const isMagic = opt?.dataset?.isMagic === "true";
@@ -313,12 +324,11 @@ function attachDialogListeners(element) {
     });
   });
 
-  // Standard: Erfolg vorselektieren
   root.querySelector(".fkr-preset[data-mode='success']")?.click();
 }
 
 // ============================================================
-//  Submit-Handler (shared für v12 + v13)
+//  Submit-Handler
 // ============================================================
 async function handleSubmit(element) {
   const root = (typeof element?.get === "function") ? element[0] : element;
@@ -333,9 +343,7 @@ async function handleSubmit(element) {
   const skillValue     = parseInt(skillSelect?.value, 10)                   || null;
   const extendedTestId = root.querySelector("#fkr-extended-select")?.value  || null;
   const isMagic        = selectedOpt?.dataset?.isMagic === "true";
-
-  // FIX: Actor-ID statt Referenz übergeben
-  const actorId = canvas?.tokens?.controlled?.[0]?.actor?.id ?? null;
+  const actorId        = canvas?.tokens?.controlled?.[0]?.actor?.id         ?? null;
 
   await performFakeRoll("1d100", result, mode, flavor, gmNote, actorId, extendedTestId, skillValue, isMagic);
 }
@@ -354,21 +362,18 @@ async function openFakeRollDialog() {
     { ...actorData, ...(targetData ?? {}) }
   );
 
-  // ── v13: DialogV2 ──────────────────────────────────────────
   if (foundry.applications?.api?.DialogV2) {
     await foundry.applications.api.DialogV2.wait({
       window:      { title: "🎲 GM: Verdeckter Würfelwurf" },
       content,
-      rejectClose: false, // FIX: explizit false für v12/v13-Konsistenz
-      // FIX: Korrekte Signatur: (event, dialog) => void
-      render: (_event, dialog) => attachDialogListeners(dialog.element),
+      rejectClose: false,
+      render:  (_event, dialog) => attachDialogListeners(dialog.element),
       buttons: [
         {
           action:   "roll",
           label:    "Würfeln",
           icon:     "fas fa-dice-d20",
           default:  true,
-          // FIX: Korrekte Signatur: (event, button, dialog) => any
           callback: (_event, _button, dialog) => handleSubmit(dialog.element),
         },
         {
@@ -378,22 +383,13 @@ async function openFakeRollDialog() {
         },
       ],
     });
-
-  // ── v12 Fallback ───────────────────────────────────────────
   } else {
     new Dialog({
       title:   "🎲 GM: Verdeckter Würfelwurf",
       content,
       buttons: {
-        roll: {
-          icon:     '<i class="fas fa-dice-d20"></i>',
-          label:    "Würfeln",
-          callback: handleSubmit,
-        },
-        cancel: {
-          icon:  '<i class="fas fa-times"></i>',
-          label: "Abbrechen",
-        },
+        roll:   { icon: '<i class="fas fa-dice-d20"></i>', label: "Würfeln",    callback: handleSubmit },
+        cancel: { icon: '<i class="fas fa-times"></i>',   label: "Abbrechen" },
       },
       default: "roll",
       render:  (html) => attachDialogListeners(html[0]),
@@ -402,7 +398,7 @@ async function openFakeRollDialog() {
 }
 
 // ============================================================
-//  Toolbar-Button (v12/v13)
+//  Toolbar-Button – FIX 1: nur onChange, kein onClick mehr
 // ============================================================
 Hooks.on("getSceneControlButtons", (controls) => {
   if (!game.user.isGM) return;
@@ -412,13 +408,12 @@ Hooks.on("getSceneControlButtons", (controls) => {
   if (!tokenLayer) return;
 
   const entry = {
-    name:    "gm-fake-roll",
-    title:   "GM: Verdeckter Würfelwurf",
-    icon:    "fas fa-user-secret",
-    visible:  true,
-    button:   true,
-    onChange: openFakeRollDialog,
-    onClick:  openFakeRollDialog,
+    name:     "gm-fake-roll",
+    title:    "GM: Verdeckter Würfelwurf",
+    icon:     "fas fa-user-secret",
+    visible:   true,
+    button:    true,
+    onChange:  openFakeRollDialog,  // FIX: onClick entfernt
   };
 
   if (Array.isArray(tokenLayer.tools)) tokenLayer.tools.push(entry);
@@ -441,7 +436,7 @@ Hooks.once("ready", () => {
   game.gmFakeRoll = { open: openFakeRollDialog, roll: performFakeRoll };
 
   console.log(
-    `%c${MODULE_ID} v4.1 | WFRP4e bereit. Shift+R zum Öffnen.`,
+    `%c${MODULE_ID} v4.2 | WFRP4e bereit. Shift+R zum Öffnen.`,
     "color:#7ec8e3; font-weight:bold;"
   );
 });
