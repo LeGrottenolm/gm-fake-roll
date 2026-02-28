@@ -1,5 +1,5 @@
 // ============================================================
-//  GM Fake Roll v5.1 – WFRP4e skipDialog + test.roll()
+//  GM Fake Roll v5.2 – Fix: test.data.preData.roll
 // ============================================================
 const MODULE_ID = "gm-fake-roll";
 
@@ -165,7 +165,7 @@ function calcPreset(mode, sv) {
 }
 
 // ============================================================
-//  KERN: WFRP4e Test mit skipDialog + direkter Roll-Injektion
+//  KERN: WFRP4e Test mit korrektem Datenpfad
 // ============================================================
 async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gmNote, isMagic) {
 
@@ -203,12 +203,14 @@ async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gm
 
     if (!test) throw new Error("Test-Objekt konnte nicht erstellt werden.");
 
-    // Ergebnis in alle bekannten WFRP4e-Datenpfade injizieren
-    test.context.roll         = desiredTotal;
-    test.context.preData.roll = desiredTotal;
+    // FIX: Korrekte Datenpfade laut Konsolenausgabe
+    test.data.preData.roll = desiredTotal;
+    if (test.data.context) {
+      test.data.context.roll = desiredTotal;
+    }
 
-    // WFRP4e wertet den Test aus: SL, Schaden, Trefferzone etc.
-    await test.roll({ roll: desiredTotal });
+    // WFRP4e wertet den Test vollständig aus
+    await test.roll();
 
   } catch (err) {
     ui.notifications.error(`[GM Fake Roll] Fehler: ${err.message}`);
@@ -377,7 +379,7 @@ Hooks.once("ready", () => {
 
   game.gmFakeRoll = { open: openFakeRollDialog, roll: performFakeRoll };
   console.log(
-    `%c${MODULE_ID} v5.1 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
+    `%c${MODULE_ID} v5.2 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
     "color:#7ec8e3; font-weight:bold;"
   );
 });
