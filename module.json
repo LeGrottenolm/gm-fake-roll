@@ -3,7 +3,19 @@
   "title": "GM Fake Roll",
   "description": "Verdeckte Würfe mit WFRP4e-Integration.",
   "version": "4.1.0",
-  "compatibility": { "minimum": "12", "verified": "13" },
-  "authors": [{ "name": "Olmo" }],
-  "esmodules": ["scripts/main.js"]
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "Olmo"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "manifest": "https://raw.githubusercontent.com/LeGrottenolm/gm-fake-roll/main/module.json",
+  "download": "https://github.com/LeGrottenolm/gm-fake-roll/archive/refs/heads/main.zip"
 }
