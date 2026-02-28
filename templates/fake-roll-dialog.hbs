@@ -17,7 +17,7 @@
     </div>
   {{else}}
     <p style="margin:0; color:#f4a460; background:#2a1a1a; padding:6px; border-radius:4px;">
-      ⚠️ Kein Token selektiert.
+      ⚠️ Kein Token selektiert – bitte Token anklicken und Dialog erneut öffnen.
     </p>
   {{/if}}
 
@@ -33,20 +33,21 @@
     </div>
   {{/if}}
 
-  {{!-- Fertigkeit --}}
+  {{!-- Fertigkeit / Waffe --}}
   <div class="form-group">
-    <label><b>Fertigkeit / Charakteristik</b></label>
+    <label><b>Fertigkeit / Charakteristik / Waffe</b></label>
     <select name="fkr-skill-select" id="fkr-skill-select" style="width:100%">
-      {{#each skills}}
-        <option value="{{this.value}}"
-          data-base="{{this.base}}"
-          data-name="{{this.name}}"
+      {{#each items}}
+        <option
+          value="{{this.value}}"
+          data-item-id="{{this.id}}"
+          data-item-type="{{this.type}}"
           data-is-magic="{{this.isMagic}}">
-          {{this.name}} ({{this.base}}{{#if this.modifier}} {{this.modifierStr}}{{/if}} = {{this.value}})
+          {{this.name}}
         </option>
       {{/each}}
-      {{#unless skills}}
-        <option value="45" data-base="45" data-is-magic="false">-- Manuell --</option>
+      {{#unless items}}
+        <option value="45" data-item-id="" data-item-type="">-- Kein Token selektiert --</option>
       {{/unless}}
     </select>
   </div>
