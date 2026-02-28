@@ -16,6 +16,6 @@
   "esmodules": [
     "scripts/main.js"
   ],
-  "manifest": "https://raw.githubusercontent.com/LeGrottenolmo/gm-fake-roll/main/module.json",
-  "download": "https://github.com/LeGrottenolmo/gm-fake-roll/archive/main.zip"
+  "manifest": "https://raw.githubusercontent.com/LeGrottenolm/gm-fake-roll/main/module.json",
+  "download": "https://github.com/LeGrottenolm/gm-fake-roll/archive/main.zip"
 }
