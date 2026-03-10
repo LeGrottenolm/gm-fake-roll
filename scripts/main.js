@@ -1,5 +1,5 @@
 // ============================================================
-//  GM Fake Roll v5.4 – Fix: Dice So Nice Animation + Fake-Wert
+//  GM Fake Roll v5.5 – Fix: Dice So Nice + Hook Chat-Patch
 // ============================================================
 const MODULE_ID = "gm-fake-roll";
 
@@ -165,7 +165,7 @@ function calcPreset(mode, sv) {
 }
 
 // ============================================================
-//  KERN: WFRP4e Test mit Dice So Nice Animation
+//  KERN: WFRP4e Test – v5.2 Basis + Dice So Nice + Hook-Patch
 // ============================================================
 async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gmNote, isMagic) {
 
@@ -203,38 +203,31 @@ async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gm
 
     if (!test) throw new Error("Test-Objekt konnte nicht erstellt werden.");
 
-    // Fake-Roll mit gewünschtem Wert erstellen
-    const fakeRoll = new Roll("1d100");
-    await fakeRoll.evaluate();
-
-    // Ergebnis hart überschreiben
-    fakeRoll.terms[0].results[0].result = desiredTotal;
-    fakeRoll._total = desiredTotal;
-
-    // Dice So Nice Animation mit Fake-Wert (falls installiert)
+    // Dice So Nice Animation mit Fake-Wert VOR dem echten Roll
     if (game.dice3d) {
+      const fakeRoll = new Roll("1d100");
+      await fakeRoll.evaluate();
+      fakeRoll.terms[0].results[0].result = desiredTotal;
+      fakeRoll._total = desiredTotal;
       await game.dice3d.showForRoll(fakeRoll, game.user, true);
     }
 
-    // Test-Ergebnis manuell setzen
-    test.data.preData.roll        = desiredTotal;
-    test.data.result              = test.data.result ?? {};
-    test.data.result.roll         = desiredTotal;
-    test.data.result.target       = test.data.preData.target ?? test.data.target;
-    test.data.result.successLevel = calcSL(desiredTotal, test.data.result.target);
-    test.data.result.outcome      =
-      desiredTotal <= test.data.result.target ? "success" : "failure";
+    // v5.2 original: preData setzen
+    test.data.preData.roll = desiredTotal;
+    if (test.data.context) {
+      test.data.context.roll = desiredTotal;
+    }
 
-    // Kritisch prüfen (Pasch)
-    const tens = Math.floor(desiredTotal / 10);
-    const ones = desiredTotal % 10;
-    test.data.result.critical =
-      tens === ones
-        ? (desiredTotal <= test.data.result.target ? "success" : "failure")
-        : null;
+    // Hook: Chat-Message nach roll() abfangen und Würfelwert im HTML patchen
+    Hooks.once("createChatMessage", (message) => {
+      let content = message.content;
+      content = content.replace(/(<span class="card-roll">)[\s\S]*?(<\/span>)/,
+        `$1<a class="inline-roll">${desiredTotal}</a>$2`);
+      message.update({ content });
+    });
 
-    // Direkt als Chat-Message senden ohne test.roll()
-    await test.sendToChat({ flavor: flavor || undefined });
+    // v5.2 original: Test ausführen → sendet Chat-Message
+    await test.roll();
 
   } catch (err) {
     ui.notifications.error(`[GM Fake Roll] Fehler: ${err.message}`);
@@ -403,7 +396,7 @@ Hooks.once("ready", () => {
 
   game.gmFakeRoll = { open: openFakeRollDialog, roll: performFakeRoll };
   console.log(
-    `%c${MODULE_ID} v5.4 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
+    `%c${MODULE_ID} v5.5 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
     "color:#7ec8e3; font-weight:bold;"
   );
 });
