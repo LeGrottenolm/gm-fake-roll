@@ -1,5 +1,5 @@
 // ============================================================
-//  GM Fake Roll v5.2 – Fix: test.data.preData.roll
+//  GM Fake Roll v5.3 – Fix: Würfelanimation + Post-Override
 // ============================================================
 const MODULE_ID = "gm-fake-roll";
 
@@ -165,7 +165,7 @@ function calcPreset(mode, sv) {
 }
 
 // ============================================================
-//  KERN: WFRP4e Test mit korrektem Datenpfad
+//  KERN: WFRP4e Test mit Animations-Fix
 // ============================================================
 async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gmNote, isMagic) {
 
@@ -203,13 +203,29 @@ async function performFakeRoll(actor, itemId, itemType, desiredTotal, flavor, gm
 
     if (!test) throw new Error("Test-Objekt konnte nicht erstellt werden.");
 
-    // FIX: Korrekte Datenpfade laut Konsolenausgabe
-    test.data.preData.roll = desiredTotal;
-    if (test.data.context) {
-      test.data.context.roll = desiredTotal;
-    }
+    // Originales roll() überschreiben → Animation läuft, danach Ergebnis patchen
+    test.roll = async function () {
+      await Object.getPrototypeOf(test).roll.call(this);
 
-    // WFRP4e wertet den Test vollständig aus
+      // Ergebnis mit gewünschtem Wert überschreiben
+      this.data.result.roll         = desiredTotal;
+      this.data.result.target       = this.data.preData.target ?? this.data.target;
+      this.data.result.successLevel = calcSL(desiredTotal, this.data.result.target);
+      this.data.result.outcome      =
+        desiredTotal <= this.data.result.target ? "success" : "failure";
+
+      // Kritisch prüfen (Pasch)
+      const tens = Math.floor(desiredTotal / 10);
+      const ones = desiredTotal % 10;
+      this.data.result.critical =
+        tens === ones
+          ? (desiredTotal <= this.data.result.target ? "success" : "failure")
+          : null;
+
+      // Chat-Message mit korrigiertem Ergebnis senden
+      await this.sendToChat({ flavor: flavor || undefined });
+    };
+
     await test.roll();
 
   } catch (err) {
@@ -379,7 +395,7 @@ Hooks.once("ready", () => {
 
   game.gmFakeRoll = { open: openFakeRollDialog, roll: performFakeRoll };
   console.log(
-    `%c${MODULE_ID} v5.2 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
+    `%c${MODULE_ID} v5.3 | WFRP4e Native bereit. Shift+R zum Öffnen.`,
     "color:#7ec8e3; font-weight:bold;"
   );
 });
